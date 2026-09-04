@@ -69,39 +69,12 @@ function AuthPage() {
             <SignUpForm />
           </TabsContent>
         </Tabs>
-
-        <div className="my-5 flex items-center gap-3 text-xs uppercase tracking-[0.14em] text-muted-foreground">
-          <span className="h-px flex-1 bg-border" /> or <span className="h-px flex-1 bg-border" />
-        </div>
-        <GoogleButton />
       </div>
     </div>
   );
 }
 
-function GoogleButton() {
-  const [busy, setBusy] = useState(false);
 
-  async function signInWithGoogle() {
-    setBusy(true);
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
-    });
-    if (result.error) {
-      setBusy(false);
-      toast.error("Google sign-in failed. Please try again.");
-      return;
-    }
-    if (result.redirected) return;
-    window.location.assign("/dashboard");
-  }
-
-  return (
-    <Button variant="outline" className="w-full" onClick={signInWithGoogle} disabled={busy}>
-      Continue with Google
-    </Button>
-  );
-}
 
 function SignInForm() {
   const [email, setEmail] = useState("");
