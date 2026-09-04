@@ -45,6 +45,7 @@ function AuthPage() {
           their own record and the results that have been reviewed and approved.
         </p>
         <ul className="mt-6 space-y-2 text-sm text-muted-foreground">
+          <li>· Sign in with your user name and your 5-number access code.</li>
           <li>· Choose your account type when you register.</li>
           <li>· Patients can link their record with their medical record number and date of birth.</li>
           <li>· Results stay hidden from patients until a second reviewer signs them off.</li>
@@ -73,20 +74,59 @@ function AuthPage() {
   );
 }
 
-
+function CodeInput({
+  id,
+  label,
+  value,
+  onChange,
+  autoComplete,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  autoComplete: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <Input
+        id={id}
+        type="password"
+        inputMode="numeric"
+        required
+        maxLength={5}
+        placeholder="•••••"
+        autoComplete={autoComplete}
+        value={value}
+        onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, 5))}
+        className="tracking-[0.5em]"
+      />
+      <p className="text-xs text-muted-foreground">Exactly 5 numbers.</p>
+    </div>
+  );
+}
 
 function SignInForm() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("");
+  const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const name = normalizeUsername(username);
+    if (!USERNAME_PATTERN.test(name) || !CODE_PATTERN.test(code)) {
+      toast.error("Check your user name and 5-number code.");
+      return;
+    }
     setBusy(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({
+      email: usernameToEmail(name),
+      password: codeToPassword(name, code),
+    });
     setBusy(false);
     if (error) {
-      toast.error(error.message);
+      toast.error("That user name and code do not match an account.");
       return;
     }
     toast.success("Signed in");
@@ -95,27 +135,22 @@ function SignInForm() {
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="signin-email">Email</Label>
+        <Label htmlFor="signin-username">User name</Label>
         <Input
-          id="signin-email"
-          type="email"
+          id="signin-username"
           required
-          autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          autoComplete="username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
         />
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="signin-password">Password</Label>
-        <Input
-          id="signin-password"
-          type="password"
-          required
-          autoComplete="current-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-      </div>
+      <CodeInput
+        id="signin-code"
+        label="Access code"
+        value={code}
+        onChange={setCode}
+        autoComplete="current-password"
+      />
       <Button type="submit" className="w-full" disabled={busy}>
         {busy ? "Signing in…" : "Sign in"}
       </Button>
@@ -125,33 +160,35 @@ function SignInForm() {
 
 function SignUpForm() {
   const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("");
+  const [code, setCode] = useState("");
   const [role, setRole] = useState<"patient" | "technologist">("patient");
   const [busy, setBusy] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (password.length < 6) {
-      toast.error("Use a password of at least 6 characters.");
+    const name = normalizeUsername(username);
+    if (!USERNAME_PATTERN.test(name)) {
+      toast.error("User name: 3-30 characters, letters and numbers only.");
+      return;
+    }
+    if (!CODE_PATTERN.test(code)) {
+      toast.error("Your access code must be exactly 5 numbers.");
       return;
     }
     setBusy(true);
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: window.location.origin,
-        data: { full_name: fullName.trim(), role },
-      },
+    const { error } = await supabase.auth.signUp({
+      email: usernameToEmail(name),
+      password: codeToPassword(name, code),
+      options: { data: { full_name: fullName.trim(), role, username: name } },
     });
     setBusy(false);
     if (error) {
-      toast.error(error.message);
-      return;
-    }
-    if (!data.session) {
-      toast.success("Account created. Check your email to confirm, then sign in.");
+      toast.error(
+        error.message.toLowerCase().includes("already")
+          ? "That user name is already taken."
+          : error.message,
+      );
       return;
     }
     toast.success("Account created");
@@ -170,27 +207,25 @@ function SignUpForm() {
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="signup-email">Email</Label>
+        <Label htmlFor="signup-username">User name</Label>
         <Input
-          id="signup-email"
-          type="email"
+          id="signup-username"
           required
-          autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          autoComplete="username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
         />
+        <p className="text-xs text-muted-foreground">
+          Letters, numbers, dots, dashes. No email needed.
+        </p>
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="signup-password">Password</Label>
-        <Input
-          id="signup-password"
-          type="password"
-          required
-          autoComplete="new-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-      </div>
+      <CodeInput
+        id="signup-code"
+        label="Choose a 5-number access code"
+        value={code}
+        onChange={setCode}
+        autoComplete="new-password"
+      />
       <div className="space-y-2">
         <Label>Account type</Label>
         <div className="grid grid-cols-2 gap-2">
@@ -216,3 +251,4 @@ function SignUpForm() {
     </form>
   );
 }
+
