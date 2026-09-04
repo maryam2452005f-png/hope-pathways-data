@@ -254,6 +254,7 @@ export type Database = {
         Row: {
           check_type: string
           created_at: string
+          discipline: string
           equipment: string
           id: string
           measured_value: string | null
@@ -266,6 +267,7 @@ export type Database = {
         Insert: {
           check_type: string
           created_at?: string
+          discipline?: string
           equipment: string
           id?: string
           measured_value?: string | null
@@ -278,6 +280,7 @@ export type Database = {
         Update: {
           check_type?: string
           created_at?: string
+          discipline?: string
           equipment?: string
           id?: string
           measured_value?: string | null
